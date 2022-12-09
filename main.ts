@@ -24,6 +24,7 @@ namespace KSRobot_Sensor {
         //% blockId="Humidity" block="Humidity"
         Humidity,
     }
+    
 
 
     //% blockId="KSRobot_dht11" block="DHT set %dht_type pin %dataPin|get %dht_state"
