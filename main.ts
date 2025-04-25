@@ -3,7 +3,13 @@ namespace KSRobot_Sensor {
 
     let initialized = false;
     let Weight_Maopi =0;
+    let flow_water_val = 0;
 
+    export enum Sensor_Version {
+        Version1 = 0,
+        Version2 = 1,
+
+    }
 
 
     export enum DHT_type {
@@ -28,6 +34,28 @@ namespace KSRobot_Sensor {
         //% blockId="Humidity" block="Humidity"
         Humidity,
     }
+
+    export enum Wind_Direction_State {
+        //% blockId="North_wind" block="North"
+        North = 0,
+        //% blockId="Northeast_wind" block="Northeast"
+        Northeast = 1,
+        //% blockId="East_wind" block="East"
+        East = 2,
+        //% blockId="Southeast_wind" block="Southeast"
+        Southeast = 3,
+        //% blockId="South_wind" block="South"
+        South = 4,
+        //% blockId="Southwest_wind" block="Southwest"
+        Southwest = 5,
+        //% blockId="West_wind" block="West"
+        West = 6,
+        //% blockId="Northwest_wind" block="Northwest"
+        Northwest = 7,
+        
+
+    }
+
 
 
     //% blockId="KSRobot_dht11" block="DHT set %dht_type pin %dataPin|get %dht_state"
@@ -194,11 +222,6 @@ namespace KSRobot_Sensor {
         return (Math.round(temp * 4 / 1024 / 10000 * 1000000 * 4))
     }
 
-    //% blockId="KSRobot_wind_sensor1" block="Wind Sensor(m/s) set pin %dataPin"
-    export function wind_sensor1(dataPin: AnalogPin): number {
-        let temp = pins.analogReadPin(dataPin)
-        return (temp * 4 / 1024 * 26)
-    }
 
     function HX711_Read(sck_pin: DigitalPin, data_pin: DigitalPin): number {
 
@@ -267,8 +290,6 @@ namespace KSRobot_Sensor {
 
         let Weight = 0;
         let HX711_Buffer =0;
-        
-        
 
         //Get_Maopi()
         if (!initialized) {
@@ -282,8 +303,6 @@ namespace KSRobot_Sensor {
 
         }
 
-
-
         //Get_Weight()
         HX711_Buffer = HX711_Read(sck_pin, data_pin);
         HX711_Buffer = HX711_Buffer / 100;
@@ -293,10 +312,184 @@ namespace KSRobot_Sensor {
         Weight = Math.round(Weight_Shiwu / 2.14);
 
 
-
         return Weight
         
     }
+
+    //% blockId="KSRobot_wind_speed" block="Wind Sensor(m/s) Version %version | set pin %dataPin"
+    export function wind_speed(version:Sensor_Version , dataPin: AnalogPin): number {
+        let temp = pins.analogReadPin(dataPin);
+        switch (version) {
+            case Sensor_Version.Version1:
+                
+                return (temp * 4 / 1024 * 26);
+                break;
+            case Sensor_Version.Version2:
+               
+                return (temp / 1024 * 5 * 6);
+                break;
+        }
+
+            
+
+    }
+    //% blockId="KSRobot_wind_direction" block="Wind Sensor set pin %dataPin"
+    export function wind_direction(dataPin: AnalogPin): number {
+        let temp = pins.analogReadPin(dataPin);
+        if(temp<50)
+            
+        {
+            return Wind_Direction_State.North;
+        }
+        else if(temp<200)
+        {
+            return Wind_Direction_State.Northeast;
+        }
+        else if(temp<350)
+        {
+            return Wind_Direction_State.East;
+        }
+        else if(temp<480)
+        {
+            return Wind_Direction_State.Southeast;
+        }
+        else if(temp<620)
+        {
+            return Wind_Direction_State.South;
+        }
+        else if(temp<760)
+        {
+            return Wind_Direction_State.Southwest;
+        }
+        else if(temp<900)
+        {
+            return Wind_Direction_State.West;
+        }
+        else(temp<1024)
+        {
+            return Wind_Direction_State.Northwest;
+        }
+
+    }
+
+
+    //% blockId="KSRobot_wind_direction_val" block="Wind Direction %wind_dir_state"
+    export function wind_direction_val(wind_dir_state: Wind_Direction_State): number {
+        return wind_dir_state;
+    }
+    
+    function flow_sensor_read(iopin: DigitalPin): void {
+
+        let temp = 0
+        let plus_flag = 0
+        let plus_cnt = 0
+        control.inBackground(function () {
+            while (true) {
+                temp = pins.digitalReadPin(iopin)
+                if (temp== 1 && plus_flag == 0) {
+                    plus_flag = 1
+                    plus_cnt += 1
+                    flow_water_val = plus_cnt / 450
+                }
+                if (temp == 0 && plus_flag == 1) {
+                    plus_flag = 0
+                }
+                basic.pause(2)
+               
+            }
+        })
+
+    }
+
+    //% blockId="KSRobot_flow_sensor_init" block="Water Flow Sensor Set pin %dataPin"
+    export function flow_sensor_init(dataPin: DigitalPin): void {
+        flow_sensor_read(dataPin)
+        
+    }
+
+    
+    //% blockId="KSRobot_read_flow_sensor" block="Read Water Flow Sensor(L）"
+    export function read_flow_sensor(): number {
+        return flow_water_val
+    
+    }
+    //% blockId="KSRobot_dissolved_oxygen" block=" Dissolved oxygen(mg/L) set pin %dataPin temperature %tempPin"
+    export function dissolved_oxygen(dataPin: AnalogPin, tempPin: DigitalPin): number {
+        let DO = 0 
+        let VREF = 5000    
+        let ADC_RES = 1023 
+
+        let CAL1_V = 5000 //mV
+        let CAL1_T = 25   //C
+        let CAL2_V = 1300 //mV
+        let CAL2_T = 15   //C
+
+        let DO_Table = [
+            14460, 14220, 13820, 13440, 13090, 12740, 12420, 12110, 11810, 11530,
+            11260, 11010, 10770, 10530, 10300, 10080, 9860, 9660, 9460, 9270,
+            9080, 8900, 8730, 8570, 8410, 8250, 8110, 7960, 7820, 7690,
+            7560, 7430, 7300, 7180, 7070, 6950, 6840, 6730, 6630, 6530, 6410
+        ]
+
+
+        let temperature_c = Math.round(dstemp.celsius(tempPin))
+        let ADC_Raw = pins.analogReadPin(dataPin);
+        let ADC_Voltage = (VREF) * ADC_Raw / ADC_RES;
+
+        let V_saturation =  (CAL1_V - CAL2_V)*(temperature_c - CAL2_T) / (CAL1_T - CAL2_T) + CAL2_V;
+        DO = (ADC_Voltage * DO_Table[temperature_c] / V_saturation);
+
+
+
+        if( DO<=0 )
+            { DO=0; }
+        if( DO>=20000 )
+            { DO=20000; }
+
+
+        return DO
+    }
+
+    //% blockId="KSRobot_CO2_readdata" block="CO2(ppm) TXD %txd| RXD %rxd"
+    export function CO2_readdata(txd: SerialPin, rxd: SerialPin): number {
+        let co2 = 0
+        let rowData: Buffer = null
+        let myBuff = pins.createBuffer(10);
+        let dataArr = [
+            255,
+            1,
+            134,
+            0,
+            0,
+            0,
+            0,
+            0,
+            121
+            ]
+        serial.redirect(
+            txd,   //TX
+            rxd,  //RX
+            BaudRate.BaudRate9600
+        );
+        serial.setRxBufferSize(10)
+        serial.setTxBufferSize(10)
+        
+        for (let i = 0; i <= 8; i++) {
+            myBuff.setNumber(NumberFormat.UInt8BE, i, dataArr[i])
+        }
+        serial.writeBuffer(myBuff)
+        basic.pause(100)
+        rowData = serial.readBuffer(0)
+        if (rowData.length > 8) {
+            if (rowData[1] == 134) {
+                co2 = 256 * rowData[2] + rowData[3]
+            
+            }
+        }
+
+        return co2
+    }
+
 
 
 
